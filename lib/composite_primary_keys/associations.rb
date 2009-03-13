@@ -423,6 +423,40 @@ module ActiveRecord::Associations
         ]
       end
     end
+    
+    def insert_record(record)
+       cols = Array.new 
+       values = Array.new    
+       cols << @reflection.through_reflection.primary_key_name.split(',')
+       cols << @reflection.source_reflection.primary_key_name.split(',')
+       values << @owner.quoted_id.split(',')
+       values << record.quoted_id.split(',')
+
+       connection.insert("INSERT INTO #{@reflection.through_reflection.table_name} " +
+                         "(#{cols.join(', ')}) " +
+                         "VALUES (#{values.join(', ')})")
+    end
+    
+    def delete_records(records)
+      case @reflection.options[:dependent]
+      when :destroy
+        records.each { |r| r.destroy }
+      when :delete_all
+        
+      else
+        connection = @reflection.active_record.connection
+        field_names = @reflection.through_reflection.primary_key_name.split(',')
+        field_values = @owner.id
+        where_clause_terms = Array.new
+        (0..field_names.size-1).each do |i|
+          where_clause_terms << "(#{field_names[i]} = '#{field_values[i]}')"
+        end
+        
+        where_clause = where_clause_terms.join(" AND ")
+        @reflection.through_reflection.klass.delete_all(where_clause)  
+      end      
+    end
+    
     alias_method_chain :construct_joins, :composite_keys
   end
 end
